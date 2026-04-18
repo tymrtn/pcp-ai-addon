@@ -1,0 +1,33 @@
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# PHP / Composer
+vendor/
+composer.lock
+*.log
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Env & secrets — NEVER commit these
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets.json
+
+# WordPress
+wp-config.php
+
+# Build artifacts
+/dist/
+/build/
+*.zip

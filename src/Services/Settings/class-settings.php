@@ -2,6 +2,12 @@
 
 namespace PCP_AI_Addon\Services\Settings;
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+use PCP_AI_Addon\Services\AI\API_Key_Manager;
+
 /**
  * Settings registration and rendering for the add-on.
  */
@@ -54,21 +60,29 @@ class Settings {
             $settings['submission_history_flag'] = false;
         }
 
-        // Store API key securely in database with encryption.
-        if ( isset( $input['openrouter_api_key'] ) ) {
-            if ( ! empty( $input['openrouter_api_key'] ) ) {
-                // Encrypt the API key using WordPress salts.
-                $settings['openrouter_api_key'] = self::encrypt_api_key( $input['openrouter_api_key'] );
-                add_settings_error(
-                    self::OPTION_KEY,
-                    'pcp_ai_api_key_saved',
-                    __( 'OpenRouter API key saved successfully.', 'pcp-ai-addon' ),
-                    'updated'
-                );
-            } else {
-                // Clear the API key if empty.
-                unset( $settings['openrouter_api_key'] );
-            }
+        // Explicit clear takes precedence.
+        if ( ! empty( $input['openrouter_api_key_clear'] ) ) {
+            unset( $settings['openrouter_api_key'] );
+            add_settings_error(
+                self::OPTION_KEY,
+                'pcp_ai_api_key_cleared',
+                __( 'OpenRouter API key cleared.', 'pcp-ai-addon' ),
+                'updated'
+            );
+            return $settings;
+        }
+
+        // A non-empty submitted key replaces the stored one. An empty submission
+        // is treated as "no change" so reloading the settings page doesn't wipe
+        // the stored key (the input is masked and intentionally empty on render).
+        if ( isset( $input['openrouter_api_key'] ) && '' !== trim( (string) $input['openrouter_api_key'] ) ) {
+            $settings['openrouter_api_key'] = self::encrypt_api_key( $input['openrouter_api_key'] );
+            add_settings_error(
+                self::OPTION_KEY,
+                'pcp_ai_api_key_saved',
+                __( 'OpenRouter API key saved successfully.', 'pcp-ai-addon' ),
+                'updated'
+            );
         }
 
         return $settings;
@@ -113,18 +127,33 @@ class Settings {
 
     /**
      * Render API key input field.
+     *
+     * When a key is already stored, the field is rendered empty with a masked
+     * placeholder so the plaintext key never appears in the page HTML. An
+     * empty submission preserves the existing key; a non-empty submission
+     * replaces it. Users can check the "clear" box to delete it.
      */
     public static function render_api_key_field() {
-        $settings = self::get_settings();
-        $api_key = ! empty( $settings['openrouter_api_key'] ) ? self::decrypt_api_key( $settings['openrouter_api_key'] ) : '';
+        $settings  = self::get_settings();
+        $has_key   = ! empty( $settings['openrouter_api_key'] );
+        $name_attr = esc_attr( self::OPTION_KEY );
         ?>
-        <input type="password" 
-               name="<?php echo esc_attr( self::OPTION_KEY ); ?>[openrouter_api_key]" 
-               value="<?php echo esc_attr( $api_key ); ?>" 
-               class="regular-text" 
-               placeholder="<?php esc_attr_e( 'Enter your OpenRouter API key', 'pcp-ai-addon' ); ?>" />
+        <input type="password"
+               name="<?php echo $name_attr; ?>[openrouter_api_key]"
+               value=""
+               autocomplete="new-password"
+               class="regular-text"
+               placeholder="<?php echo $has_key ? esc_attr__( '••••••••  (key saved — leave blank to keep)', 'pcp-ai-addon' ) : esc_attr__( 'Enter your OpenRouter API key', 'pcp-ai-addon' ); ?>" />
+        <?php if ( $has_key ) : ?>
+            <p>
+                <label>
+                    <input type="checkbox" name="<?php echo $name_attr; ?>[openrouter_api_key_clear]" value="1" />
+                    <?php esc_html_e( 'Clear saved OpenRouter API key', 'pcp-ai-addon' ); ?>
+                </label>
+            </p>
+        <?php endif; ?>
         <p class="description">
-            <?php esc_html_e( 'Your OpenRouter API key is encrypted and stored securely in the database.', 'pcp-ai-addon' ); ?>
+            <?php esc_html_e( 'Your OpenRouter API key is encrypted with WordPress salts and stored in the database. Leave the field blank to keep the existing key.', 'pcp-ai-addon' ); ?>
         </p>
         <?php
     }
@@ -172,34 +201,23 @@ class Settings {
             return '';
         }
 
-        $key = wp_salt( 'AUTH_KEY' );
-        $iv = wp_salt( 'SECURE_AUTH_KEY' );
-        $iv = substr( hash( 'sha256', $iv ), 0, 16 );
-        
-        $encrypted = openssl_encrypt( $api_key, 'AES-256-CBC', $key, 0, $iv );
-        
-        return base64_encode( $encrypted );
-    }
+        $key = wp_salt( 'auth' );
+        $iv  = substr( hash( 'sha256', wp_salt( 'secure_auth' ) ), 0, 16 );
 
-    /**
-     * Decrypt API key using WordPress salts.
-     *
-     * @param string $encrypted_api_key The encrypted API key.
-     * @return string Decrypted API key.
-     */
-    private static function decrypt_api_key( $encrypted_api_key ) {
-        if ( empty( $encrypted_api_key ) ) {
+        $encrypted = openssl_encrypt( $api_key, 'AES-256-CBC', $key, 0, $iv );
+
+        if ( false === $encrypted ) {
+            add_settings_error(
+                self::OPTION_KEY,
+                'pcp_ai_api_key_encrypt_failed',
+                __( 'OpenRouter API key could not be encrypted. Please try again.', 'pcp-ai-addon' ),
+                'error'
+            );
             return '';
         }
 
-        $key = wp_salt( 'AUTH_KEY' );
-        $iv = wp_salt( 'SECURE_AUTH_KEY' );
-        $iv = substr( hash( 'sha256', $iv ), 0, 16 );
-        
-        $encrypted = base64_decode( $encrypted_api_key );
-        $decrypted = openssl_decrypt( $encrypted, 'AES-256-CBC', $key, 0, $iv );
-        
-        return $decrypted ?: '';
+        return base64_encode( $encrypted );
     }
+
 }
 

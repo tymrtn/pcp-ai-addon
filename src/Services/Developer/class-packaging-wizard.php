@@ -2,6 +2,10 @@
 
 namespace PCP_AI_Addon\Services\Developer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 /**
  * Placeholder developer workflow wizard.
  */

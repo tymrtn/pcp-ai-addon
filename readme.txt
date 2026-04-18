@@ -13,7 +13,7 @@ Feature-rich add-on for Plugin Check that introduces AI-assisted triage, develop
 
 This add-on integrates with the official Plugin Check plugin to:
 
-* Orchestrate AI-powered reviews using OpenRouter (Sonnet 4.5) via environment-stored API keys.
+* Orchestrate AI-powered reviews using OpenRouter (default: Claude Sonnet 4.5; model is configurable).
 * Provide developer-focused packaging guidance before submitting to WordPress.org.
 * Prepare for submission history insights with feature-flagged UI placeholders.
 
@@ -21,8 +21,8 @@ This add-on integrates with the official Plugin Check plugin to:
 
 1. Install and activate Plugin Check (PCP).
 2. Upload this add-on to `wp-content/plugins/pcp-ai-addon/` and activate it.
-3. Define `OPENROUTER_API_KEY` in your environment (`.env`, wp-config, or hosting secrets) for AI access.
-4. Visit **Settings > PCP AI Add-on** to review configuration and upcoming features.
+3. Provide your OpenRouter API key either as the `OPENROUTER_API_KEY` environment variable (`.env`, wp-config, or hosting secrets) or by pasting it into **Settings > PCP AI Add-on** (stored encrypted with WordPress salts).
+4. Run Plugin Check — AI review results appear alongside the static findings.
 
 == Changelog ==
 

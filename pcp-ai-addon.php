@@ -5,6 +5,7 @@
  * Version: 0.1.0-dev
  * Author: Copyright.sh / PCP AI Team
  * License: GPL-2.0-or-later
+ * Text Domain: pcp-ai-addon
  */
 
 namespace PCP_AI_Addon;

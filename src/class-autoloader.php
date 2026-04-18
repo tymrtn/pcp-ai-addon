@@ -2,6 +2,10 @@
 
 namespace PCP_AI_Addon;
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 /**
  * Simple PSR-4 autoloader for the PCP AI Add-on namespace.
  */

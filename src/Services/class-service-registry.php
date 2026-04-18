@@ -2,6 +2,10 @@
 
 namespace PCP_AI_Addon\Services;
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 /**
  * Simple service registry to bootstrap components.
  */

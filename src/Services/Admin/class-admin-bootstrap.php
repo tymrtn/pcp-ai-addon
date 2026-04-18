@@ -2,6 +2,10 @@
 
 namespace PCP_AI_Addon\Services\Admin;
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 use PCP_AI_Addon\Services\Settings\Settings;
 
 /**

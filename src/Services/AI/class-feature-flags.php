@@ -2,6 +2,10 @@
 
 namespace PCP_AI_Addon\Services\AI;
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 /**
  * Handles feature flags and future AI capabilities.
  */

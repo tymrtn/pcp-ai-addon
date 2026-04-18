@@ -2,6 +2,10 @@
 
 namespace PCP_AI_Addon\Services\AI;
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 use PCP_AI_Addon\Services\Settings\Settings;
 
 /**
@@ -37,21 +41,21 @@ class API_Key_Manager {
     /**
      * Decrypt API key using WordPress salts.
      *
+     * Public so `Settings` can reuse it without duplicating the decrypt logic.
+     *
      * @param string $encrypted_api_key The encrypted API key.
      * @return string Decrypted API key.
      */
-    private static function decrypt_api_key( $encrypted_api_key ) {
+    public static function decrypt_api_key( $encrypted_api_key ) {
         if ( empty( $encrypted_api_key ) ) {
             return '';
         }
 
-        $key = wp_salt( 'AUTH_KEY' );
-        $iv = wp_salt( 'SECURE_AUTH_KEY' );
-        $iv = substr( hash( 'sha256', $iv ), 0, 16 );
-        
+        $key       = wp_salt( 'auth' );
+        $iv        = substr( hash( 'sha256', wp_salt( 'secure_auth' ) ), 0, 16 );
         $encrypted = base64_decode( $encrypted_api_key );
         $decrypted = openssl_decrypt( $encrypted, 'AES-256-CBC', $key, 0, $iv );
-        
+
         return $decrypted ?: '';
     }
 }

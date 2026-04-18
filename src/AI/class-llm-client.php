@@ -2,6 +2,10 @@
 
 namespace PCP_AI_Addon\AI;
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 use PCP_AI_Addon\Services\AI\API_Key_Manager;
 
 /**
@@ -10,26 +14,27 @@ use PCP_AI_Addon\Services\AI\API_Key_Manager;
 class LLM_Client {
 
     const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-    const DEFAULT_MODEL = 'x-ai/grok-code-fast-1';
+    const DEFAULT_MODEL      = 'anthropic/claude-sonnet-4.5';
+    const RATE_LIMIT_WINDOW  = 60;
+    const RATE_LIMIT_MAX     = 10;
 
     /**
      * Make an API call to OpenRouter.
      *
      * @param string $prompt The prompt to send.
      * @param array $options Optional settings (model, temperature, etc.).
-     * @return array|WP_Error Response data or error.
+     * @return array|\WP_Error Response data or error.
      */
     public static function call( $prompt, $options = array() ) {
-        // TODO: Remove hardcoded key - this is for testing only!
+        $rate_limit = self::check_rate_limit();
+        if ( is_wp_error( $rate_limit ) ) {
+            return $rate_limit;
+        }
+
         $api_key = getenv( 'OPENROUTER_API_KEY' );
-        
+
         if ( empty( $api_key ) ) {
             $api_key = API_Key_Manager::get_openrouter_api_key();
-        }
-        
-        // TEMPORARY: Use hardcoded key for testing.
-        if ( empty( $api_key ) || strlen( $api_key ) > 100 ) {
-            $api_key = '***REMOVED-OPENROUTER-KEY***';
         }
 
         if ( empty( $api_key ) ) {
@@ -65,7 +70,7 @@ class LLM_Client {
                     'HTTP-Referer' => home_url(),
                 ),
                 'body' => wp_json_encode( $body ),
-                'timeout' => 60,
+                'timeout' => 30,
             )
         );
 
@@ -98,6 +103,66 @@ class LLM_Client {
             'model' => $data['model'] ?? $settings['model'],
             'usage' => $data['usage'] ?? array(),
         );
+    }
+
+    /**
+     * Per-user transient rate limit. Skipped in WP-CLI.
+     *
+     * @return true|\WP_Error
+     */
+    protected static function check_rate_limit() {
+        if ( defined( 'WP_CLI' ) && WP_CLI ) {
+            return true;
+        }
+
+        $user_id = function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0;
+        $bucket  = 'pcp_ai_rl_' . $user_id;
+        $count   = (int) get_transient( $bucket );
+
+        if ( $count >= self::RATE_LIMIT_MAX ) {
+            return new \WP_Error(
+                'rate_limited',
+                sprintf(
+                    /* translators: 1: max calls, 2: window in seconds */
+                    __( 'AI review rate limit reached (%1$d calls per %2$d seconds). Try again shortly.', 'pcp-ai-addon' ),
+                    self::RATE_LIMIT_MAX,
+                    self::RATE_LIMIT_WINDOW
+                )
+            );
+        }
+
+        set_transient( $bucket, $count + 1, self::RATE_LIMIT_WINDOW );
+        return true;
+    }
+
+    /**
+     * Sanitize untrusted strings before interpolation into prompts.
+     *
+     * Strips newlines and control chars, truncates, and wraps in
+     * <untrusted>...</untrusted> so the model can distinguish data
+     * from instructions (prompt-injection defense for plugin metadata).
+     *
+     * @param string $value Raw value.
+     * @param int    $max   Max characters (default 200).
+     * @return string Safe string for prompt interpolation.
+     */
+    public static function sanitize_for_prompt( $value, $max = 200 ) {
+        $value = is_scalar( $value ) ? (string) $value : '';
+        $value = preg_replace( '/[\x00-\x1F\x7F]+/u', ' ', $value );
+        $value = preg_replace( '/\s+/u', ' ', $value );
+        $value = trim( $value );
+
+        if ( function_exists( 'mb_substr' ) ) {
+            $value = mb_substr( $value, 0, $max );
+        } else {
+            $value = substr( $value, 0, $max );
+        }
+
+        if ( '' === $value ) {
+            $value = 'Unknown';
+        }
+
+        return '<untrusted>' . $value . '</untrusted>';
     }
 }
 
