@@ -42,7 +42,7 @@ class LLM_Client {
         }
 
         $defaults = array(
-            'model' => self::DEFAULT_MODEL,
+            'model' => \PCP_AI_Addon\Services\Settings\Settings::get_effective_model(),
             'temperature' => 0.2,
             'max_tokens' => 10000,
         );

@@ -16,6 +16,23 @@ class Settings {
     const OPTION_KEY = 'pcp_ai_addon_settings';
 
     /**
+     * Curated model options for the selector (OpenRouter slugs).
+     * "custom" allows any OpenRouter model via a free-text field.
+     *
+     * @return array<string,string> slug => human label
+     */
+    public static function get_model_options() {
+        return array(
+            'anthropic/claude-opus-4.7'   => __( 'Claude Opus 4.7 (default, highest quality)', 'pcp-ai-addon' ),
+            'anthropic/claude-sonnet-4.6' => __( 'Claude Sonnet 4.6 (fast, cost-balanced)', 'pcp-ai-addon' ),
+            'anthropic/claude-haiku-4.5'  => __( 'Claude Haiku 4.5 (cheapest, fastest)', 'pcp-ai-addon' ),
+            'openai/gpt-5'                => __( 'OpenAI GPT-5', 'pcp-ai-addon' ),
+            'x-ai/grok-code-fast-1'       => __( 'xAI Grok Code Fast', 'pcp-ai-addon' ),
+            'custom'                      => __( 'Custom (enter OpenRouter slug below)', 'pcp-ai-addon' ),
+        );
+    }
+
+    /**
      * Register settings, sections, and fields.
      */
     public static function register() {
@@ -32,6 +49,14 @@ class Settings {
             'openrouter_api_key',
             __( 'OpenRouter API Key', 'pcp-ai-addon' ),
             array( __CLASS__, 'render_api_key_field' ),
+            self::OPTION_KEY,
+            'pcp_ai_general'
+        );
+
+        add_settings_field(
+            'openrouter_model',
+            __( 'AI Model', 'pcp-ai-addon' ),
+            array( __CLASS__, 'render_model_field' ),
             self::OPTION_KEY,
             'pcp_ai_general'
         );
@@ -58,6 +83,18 @@ class Settings {
             $settings['submission_history_flag'] = (bool) $input['submission_history_flag'];
         } else {
             $settings['submission_history_flag'] = false;
+        }
+
+        // Model selection.
+        $model_choice = isset( $input['openrouter_model'] ) ? sanitize_text_field( (string) $input['openrouter_model'] ) : '';
+        if ( 'custom' === $model_choice ) {
+            $custom_slug = isset( $input['openrouter_model_custom'] ) ? sanitize_text_field( (string) $input['openrouter_model_custom'] ) : '';
+            // Permissive: OpenRouter slugs are `vendor/model-id` with letters, digits, dots, dashes, underscores, slashes.
+            if ( '' !== $custom_slug && preg_match( '#^[a-z0-9._/-]+$#i', $custom_slug ) ) {
+                $settings['openrouter_model'] = $custom_slug;
+            }
+        } elseif ( array_key_exists( $model_choice, self::get_model_options() ) ) {
+            $settings['openrouter_model'] = $model_choice;
         }
 
         // Explicit clear takes precedence.
@@ -156,6 +193,67 @@ class Settings {
             <?php esc_html_e( 'Your OpenRouter API key is encrypted with WordPress salts and stored in the database. Leave the field blank to keep the existing key.', 'pcp-ai-addon' ); ?>
         </p>
         <?php
+    }
+
+    /**
+     * Render AI model selector.
+     */
+    public static function render_model_field() {
+        $settings  = self::get_settings();
+        $current   = isset( $settings['openrouter_model'] ) ? (string) $settings['openrouter_model'] : '';
+        $options   = self::get_model_options();
+        $is_custom = ( '' !== $current && ! array_key_exists( $current, $options ) );
+        $selected  = $is_custom ? 'custom' : ( '' === $current ? 'anthropic/claude-opus-4.7' : $current );
+        $name_attr = esc_attr( self::OPTION_KEY );
+        ?>
+        <select id="pcp_ai_openrouter_model"
+                name="<?php echo $name_attr; ?>[openrouter_model]"
+                class="regular-text">
+            <?php foreach ( $options as $slug => $label ) : ?>
+                <option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $selected, $slug ); ?>>
+                    <?php echo esc_html( $label ); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <p>
+            <input type="text"
+                   id="pcp_ai_openrouter_model_custom"
+                   name="<?php echo $name_attr; ?>[openrouter_model_custom]"
+                   value="<?php echo esc_attr( $is_custom ? $current : '' ); ?>"
+                   class="regular-text code"
+                   placeholder="vendor/model-slug"
+                   <?php echo $is_custom ? '' : 'style="display:none;"'; ?> />
+        </p>
+        <p class="description">
+            <?php
+            printf(
+                /* translators: %s: URL to OpenRouter models list */
+                esc_html__( 'Default is Claude Opus 4.7. Choose "Custom" to use any OpenRouter slug — see %s for the full list.', 'pcp-ai-addon' ),
+                '<a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a>'
+            );
+            ?>
+        </p>
+        <script>
+        (function () {
+            var sel = document.getElementById('pcp_ai_openrouter_model');
+            var cust = document.getElementById('pcp_ai_openrouter_model_custom');
+            if ( ! sel || ! cust ) { return; }
+            sel.addEventListener('change', function () {
+                cust.style.display = ( sel.value === 'custom' ) ? '' : 'none';
+            });
+        })();
+        </script>
+        <?php
+    }
+
+    /**
+     * Resolve the effective model slug (stored setting or DEFAULT_MODEL fallback).
+     *
+     * @return string
+     */
+    public static function get_effective_model() {
+        $settings = self::get_settings();
+        return ! empty( $settings['openrouter_model'] ) ? (string) $settings['openrouter_model'] : \PCP_AI_Addon\AI\LLM_Client::DEFAULT_MODEL;
     }
 
     /**

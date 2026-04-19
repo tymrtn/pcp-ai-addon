@@ -36,6 +36,7 @@ class Plugin {
         $this->services->register( new Services\Admin\Admin_Bootstrap() );
         $this->services->register( new Services\Developer\Packaging_Wizard() );
         $this->services->register( new Services\AI\Feature_Flags() );
+        $this->services->register( new Services\REST\REST_Controller() );
 
         // Register AI checks with Plugin Check.
         add_filter( 'wp_plugin_check_checks', array( $this, 'register_ai_checks' ) );
