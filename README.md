@@ -3,12 +3,13 @@
 AI-assisted triage and developer guidance layer on top of the [Plugin Check](https://wordpress.org/plugins/plugin-check/) (PCP) plugin.
 
 ## Status
-Developer preview — **0.1.0-dev**. Not yet submitted to WordPress.org.
+Current release: **v0.2.0**. Not yet submitted to WordPress.org — distributed via this GitHub repo.
 
 ## What it does
 - Runs five AI review passes (general, security, performance, accessibility, WP.org repo guidelines) alongside PCP's static checks.
-- Uses OpenRouter as the inference backend so you can choose between Sonnet, Grok, GPT, etc.
-- Adds a Settings page (**Settings → PCP AI Add-on**) with feature flags and packaging guidance.
+- Uses OpenRouter as the inference backend. **Default model: Claude Opus 4.7** (`anthropic/claude-opus-4.7`). Switchable in Settings to Sonnet 4.6, Haiku 4.5, GPT-5, Grok, or any custom OpenRouter slug.
+- Settings page at **Settings → PCP AI Add-on** for API key + model selection.
+- **Agent-addressable** via a JSON REST endpoint and an MCP server (see [Agent access](#agent-access) below).
 
 ## Requirements
 - WordPress 6.3+ (6.5+ recommended)
@@ -23,9 +24,42 @@ Developer preview — **0.1.0-dev**. Not yet submitted to WordPress.org.
 4. Provide your OpenRouter API key via `OPENROUTER_API_KEY` environment variable, or Settings → PCP AI Add-on.
 5. Run Plugin Check as usual — AI review results appear alongside the static findings.
 
+## Agent access
+
+Every review the add-on produces is addressable from outside WordPress so coding agents can pull reviews into their own workflows.
+
+### REST (Markdown or JSON)
+```
+GET /wp-json/pcp-ai/v1/review?plugin=<slug-or-basename>[&format=md]
+```
+- Auth: WordPress cookie (for the UI) or an [Application Password](https://wordpress.org/documentation/article/application-passwords/) (for agents).
+- Capability: `manage_options`.
+- Default response is JSON; pass `format=md` for a ready-to-paste Markdown review.
+
+### MCP server
+```
+POST /wp-json/pcp-ai/v1/mcp
+```
+A minimal JSON-RPC 2.0 [Model Context Protocol](https://modelcontextprotocol.io/) server. Implements `initialize`, `tools/list`, and `tools/call`. Exposes a single tool:
+
+- **`pcp_ai.review`** — inputs `{ plugin: string, no_cache?: boolean }`, returns structured severity / summary / issues / recommendations plus a Markdown rendering.
+
+Smoke-test with the MCP Inspector:
+```
+npx @modelcontextprotocol/inspector --cli https://your-site/wp-json/pcp-ai/v1/mcp \
+  -H "Authorization: Basic $(echo -n user:app-password | base64)"
+```
+
+This is the piece that lets agents that speak MCP — Claude Code, Cursor, Codex, [@wporg/mcp](https://make.wordpress.org/meta/2026/03/20/plugin-directory-mcp-server/) — invoke an AI review as part of a larger submission or audit flow.
+
+## Versioning
+Semantic versioning. Tags on the `main` branch are the authoritative release markers — see [Releases](https://github.com/tymrtn/pcp-ai-addon/releases) for changelogs. `readme.txt`'s `Stable tag` mirrors the latest release tag.
+
 ## Security
 - API key never appears in plugin source. It is loaded from environment or the WP options table (encrypted with WordPress salts).
-- All admin endpoints require `manage_options` capability.
+- All admin and REST endpoints require `manage_options` capability.
+- Plugin metadata is sanitized before LLM prompts (prompt-injection defense).
+- Per-user rate limit (10 calls/minute) on LLM calls.
 - Direct PHP access is blocked in every file.
 
 ## License

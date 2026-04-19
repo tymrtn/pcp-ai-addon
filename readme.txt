@@ -3,7 +3,7 @@ Contributors: copyrightsh
 Requires at least: 6.3
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.2.0-dev
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,7 +26,7 @@ This add-on integrates with the official Plugin Check plugin to:
 
 == Changelog ==
 
-= 0.2.0-dev =
+= 0.2.0 =
 * AI model selector in Settings (Opus 4.7, Sonnet 4.6, Haiku 4.5, GPT-5, Grok, or any custom OpenRouter slug).
 * REST endpoint `GET /wp-json/pcp-ai/v1/review?plugin=slug[&format=md]` returns a structured AI review as JSON or Markdown.
 * MCP server at `POST /wp-json/pcp-ai/v1/mcp` exposes a `pcp_ai.review` tool to any Model Context Protocol client (Claude Code, Cursor, Codex, @wporg/mcp).
