@@ -14,7 +14,7 @@ use PCP_AI_Addon\Services\AI\API_Key_Manager;
 class LLM_Client {
 
     const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-    const DEFAULT_MODEL      = 'anthropic/claude-sonnet-4.5';
+    const DEFAULT_MODEL      = 'anthropic/claude-opus-4.7';
     const RATE_LIMIT_WINDOW  = 60;
     const RATE_LIMIT_MAX     = 10;
 

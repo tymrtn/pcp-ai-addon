@@ -13,7 +13,7 @@ Feature-rich add-on for Plugin Check that introduces AI-assisted triage, develop
 
 This add-on integrates with the official Plugin Check plugin to:
 
-* Orchestrate AI-powered reviews using OpenRouter (default: Claude Sonnet 4.5; model is configurable).
+* Orchestrate AI-powered reviews using OpenRouter (default: Claude Opus 4.7; model is configurable).
 * Provide developer-focused packaging guidance before submitting to WordPress.org.
 * Prepare for submission history insights with feature-flagged UI placeholders.
 
