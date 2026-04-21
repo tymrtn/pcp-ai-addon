@@ -3,7 +3,7 @@ Contributors: copyrightsh
 Requires at least: 6.3
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,12 @@ This add-on integrates with the official Plugin Check plugin to:
 4. Run Plugin Check — AI review results appear alongside the static findings.
 
 == Changelog ==
+
+= 0.3.0 =
+* Guideline-grounded review prompts. Each of the 5 category checks now cites the specific WordPress.org Detailed Plugin Guidelines that apply to that category and requires the AI to emit a per-guideline PASS / FAIL / UNCLEAR verdict with evidence.
+* FAILs surface as Plugin Check errors; UNCLEAR as warnings; each carries a deep link to the guideline text on developer.wordpress.org.
+* New compliance rollup line on every category summary: "Compliance: N PASS / N FAIL / N UNCLEAR (of N checkable)".
+* New registry class `PCP_AI_Addon\Guidelines\WPOrg_Guidelines` maps each of the 18 numbered guidelines to a review category.
 
 = 0.2.0 =
 * AI model selector in Settings (Opus 4.7, Sonnet 4.6, Haiku 4.5, GPT-5, Grok, or any custom OpenRouter slug).

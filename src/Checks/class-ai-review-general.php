@@ -7,6 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 use PCP_AI_Addon\AI\LLM_Client;
+use PCP_AI_Addon\Guidelines\WPOrg_Guidelines;
 use WordPress\Plugin_Check\Checker\Check_Result;
 use WordPress\Plugin_Check\Checker\Checks\Abstract_File_Check;
 use WordPress\Plugin_Check\Traits\Amend_Check_Result;
@@ -118,11 +119,54 @@ class AI_Review_General extends Abstract_File_Check {
 		}
 
 		// Parse AI response into structured findings.
-		$ai_content = $ai_response['content'];
-		$severity_level = $this->extract_severity_level( $ai_content );
-		$summary = $this->extract_summary( $ai_content );
-		$issues = $this->extract_issues( $ai_content );
+		$ai_content      = $ai_response['content'];
+		$severity_level  = $this->extract_severity_level( $ai_content );
+		$summary         = $this->extract_summary( $ai_content );
+		$issues          = $this->extract_issues( $ai_content );
 		$recommendations = $this->extract_recommendations( $ai_content );
+		$verdicts        = $this->extract_verdicts( $ai_content );
+
+		// Emit per-guideline verdict messages BEFORE the summary so failures
+		// surface prominently in Plugin Check's results UI.
+		$pass = 0;
+		$fail = 0;
+		$unclear = 0;
+		foreach ( $verdicts as $verdict ) {
+			$guideline = WPOrg_Guidelines::get( $verdict['id'] );
+			if ( null === $guideline ) {
+				continue;
+			}
+			$verdict_label = $verdict['verdict'];
+			if ( 'FAIL' === $verdict_label ) {
+				$fail++;
+				$result->add_message(
+					true,
+					sprintf(
+						__( '[%1$s] %2$s — FAIL. %3$s See: %4$s', 'pcp-ai-addon' ),
+						$guideline['id'],
+						$guideline['title'],
+						$verdict['evidence'],
+						$guideline['url']
+					),
+					array( 'code' => 'ai_guideline_' . strtolower( $guideline['id'] ) )
+				);
+			} elseif ( 'UNCLEAR' === $verdict_label ) {
+				$unclear++;
+				$result->add_message(
+					false,
+					sprintf(
+						__( '[%1$s] %2$s — UNCLEAR. %3$s See: %4$s', 'pcp-ai-addon' ),
+						$guideline['id'],
+						$guideline['title'],
+						$verdict['evidence'],
+						$guideline['url']
+					),
+					array( 'code' => 'ai_guideline_' . strtolower( $guideline['id'] ) )
+				);
+			} else {
+				$pass++;
+			}
+		}
 
 		// Add AI summary with severity badge.
 		$severity_badges = array(
@@ -133,14 +177,27 @@ class AI_Review_General extends Abstract_File_Check {
 		);
 		$severity_emoji = $severity_badges[ $severity_level ] ?? '✅';
 
+		$checkable_total = count( WPOrg_Guidelines::for_category( $category ) );
+		$compliance_line = '';
+		if ( $checkable_total > 0 ) {
+			$compliance_line = sprintf(
+				' — Compliance: %d PASS / %d FAIL / %d UNCLEAR (of %d checkable)',
+				$pass,
+				$fail,
+				$unclear,
+				$checkable_total
+			);
+		}
+
 		$result->add_message(
 			false,
 			sprintf(
-				'%s AI Review (%s) [%s]: %s',
+				'%s AI Review (%s) [%s]: %s%s',
 				$severity_emoji,
 				ucfirst( str_replace( '_', ' ', $category ) ),
 				$severity_level,
-				$summary
+				$summary,
+				$compliance_line
 			),
 			array(
 				'code' => 'ai_summary_' . $category,
@@ -195,101 +252,73 @@ class AI_Review_General extends Abstract_File_Check {
 	 * @return string Prompt.
 	 */
 	protected function build_ai_prompt( $plugin_data, $errors, $warnings, $file_count, $php_count, $category, $focus ) {
-		$error_count = $this->count_messages( $errors );
-		$warning_count = $this->count_messages( $warnings );
+		$error_count     = $this->count_messages( $errors );
+		$warning_count   = $this->count_messages( $warnings );
+		$issue_summary   = $this->summarize_issues( $errors, $warnings );
+		$guidelines      = WPOrg_Guidelines::render_prompt_block( $category );
+		$guideline_list  = WPOrg_Guidelines::for_category( $category );
+		$guideline_ids   = array_map( function ( $g ) { return $g['id']; }, $guideline_list );
+		$verdict_section = '';
 
-		// Build a summary of warnings (no errors since we skip AI if errors exist).
-		$issue_summary = $this->summarize_issues( $errors, $warnings );
-
-		$has_warnings = ! empty( $warnings );
-
-		if ( $has_warnings ) {
-			$prompt = sprintf(
-				"You are an expert WordPress plugin reviewer providing best practices guidance for the %s category (%s).\n\n" .
-				"PLUGIN INFO:\n" .
-				"- Name: %s\n" .
-				"- Version: %s\n" .
-				"- Files: %d total (%d PHP files)\n\n" .
-				"CATEGORY: %s\n" .
-				"FOCUS: %s\n\n" .
-				"PLUGIN CHECK RESULTS (%s CATEGORY):\n" .
-				"- Errors: 0 (passed!)\n" .
-				"- Warnings: %d\n\n" .
-				"%s\n\n" .
-				"CONTEXT:\n" .
-				"This plugin passed all error-level checks in the %s category. Your role is to review the warnings and provide actionable guidance for improvement.\n\n" .
-				"IMPORTANT:\n" .
-				"- Focus ONLY on %s category warnings\n" .
-				"- Explain the implications of each warning\n" .
-				"- Provide specific improvement recommendations with code examples\n" .
-				"- Frame as improvements, not critical fixes\n\n" .
-				"Provide your analysis in this EXACT format:\n\n" .
-				"**TRIAGE LEVEL**: [TRIVIAL|MINOR|MODERATE] (use TRIVIAL or MINOR since no errors exist)\n\n" .
-				"**SUMMARY**: 2-3 sentences about potential improvements for the %s warnings.\n\n" .
-				"**KEY OBSERVATIONS** (if any exist):\n" .
-				"1. Observation about warning\n" .
-				"2. Observation about warning\n\n" .
-				"**RECOMMENDATIONS** (specific improvements):\n" .
-				"1. Specific improvement with code example\n" .
-				"2. Specific improvement with code example",
-				strtoupper( $category ),
-				$focus,
-				$plugin_data['Name'] ?? 'Unknown',
-				$plugin_data['Version'] ?? 'Unknown',
-				$file_count,
-				$php_count,
-				strtoupper( $category ),
-				$focus,
-				strtoupper( $category ),
-				$warning_count,
-				$issue_summary,
-				$category,
-				$category,
-				$category
-			);
-		} else {
-			$prompt = sprintf(
-				"You are an expert WordPress plugin reviewer providing best practices guidance for the %s category (%s).\n\n" .
-				"PLUGIN INFO:\n" .
-				"- Name: %s\n" .
-				"- Version: %s\n" .
-				"- Files: %d total (%d PHP files)\n\n" .
-				"CATEGORY: %s\n" .
-				"FOCUS: %s\n\n" .
-				"PLUGIN CHECK RESULTS (%s CATEGORY):\n" .
-				"- Errors: 0 (passed!)\n" .
-				"- Warnings: 0 (passed!)\n\n" .
-				"CONTEXT:\n" .
-				"This plugin passed ALL checks in the %s category with no errors or warnings. Your role is to provide expert-level best practices and potential enhancements.\n\n" .
-				"IMPORTANT:\n" .
-				"- Focus ONLY on %s category best practices\n" .
-				"- Suggest advanced optimizations, edge cases to consider, or modern WordPress patterns\n" .
-				"- Keep recommendations practical and high-value\n" .
-				"- Limit to 2-3 key recommendations\n\n" .
-				"Provide your analysis in this EXACT format:\n\n" .
-				"**TRIAGE LEVEL**: TRIVIAL (no issues found)\n\n" .
-				"**SUMMARY**: 1-2 sentences acknowledging clean code and suggesting areas for enhancement.\n\n" .
-				"**BEST PRACTICE SUGGESTIONS**:\n" .
-				"1. Enhancement suggestion with rationale\n" .
-				"2. Enhancement suggestion with rationale\n\n" .
-				"**RECOMMENDATIONS** (optional improvements):\n" .
-				"1. Specific enhancement with code example if applicable\n" .
-				"2. Specific enhancement with code example if applicable",
-				strtoupper( $category ),
-				$focus,
-				$plugin_data['Name'] ?? 'Unknown',
-				$plugin_data['Version'] ?? 'Unknown',
-				$file_count,
-				$php_count,
-				strtoupper( $category ),
-				$focus,
-				strtoupper( $category ),
-				$category,
-				$category
+		if ( ! empty( $guideline_ids ) ) {
+			$example_id = $guideline_ids[0];
+			$verdict_section = sprintf(
+				"**GUIDELINE VERDICTS** (one line per guideline ID, mandatory):\n" .
+				"Emit one line for EACH guideline listed above in this exact shape:\n" .
+				"`[ID] VERDICT — evidence`\n" .
+				"Where VERDICT is exactly one of: PASS, FAIL, UNCLEAR.\n" .
+				"Use FAIL only when you have concrete evidence of violation.\n" .
+				"Use UNCLEAR when you cannot tell from the info provided (e.g. would need to read more source).\n" .
+				"Use PASS when evidence suggests compliance OR when the guideline is structurally N/A to this plugin.\n" .
+				"Example: `[%s] PASS — plugin header declares 'License: GPL-2.0-or-later' and no bundled code appears non-GPL-compatible.`\n",
+				$example_id
 			);
 		}
 
-		return $prompt;
+		$header = sprintf(
+			"You are an expert WordPress.org plugin reviewer. Your output is consumed by developers preparing a submission to the WordPress.org plugin directory. Be specific, cite evidence from the code or metadata provided, and do NOT hallucinate violations.\n\n" .
+			"PLUGIN INFO:\n" .
+			"- Name: %s\n" .
+			"- Version: %s\n" .
+			"- Files: %d total (%d PHP files)\n\n" .
+			"REVIEW CATEGORY: %s\n" .
+			"CATEGORY FOCUS: %s\n\n" .
+			"PLUGIN CHECK (STATIC) RESULTS (%s CATEGORY):\n" .
+			"- Errors: %d\n" .
+			"- Warnings: %d\n\n" .
+			"%s\n\n",
+			LLM_Client::sanitize_for_prompt( $plugin_data['Name'] ?? 'Unknown' ),
+			LLM_Client::sanitize_for_prompt( $plugin_data['Version'] ?? 'Unknown' ),
+			$file_count,
+			$php_count,
+			strtoupper( $category ),
+			$focus,
+			strtoupper( $category ),
+			$error_count,
+			$warning_count,
+			$issue_summary
+		);
+
+		$rules = $guidelines ? ( $guidelines . "\n\n" ) : '';
+
+		$instructions = "IMPORTANT RULES:\n" .
+			"- Treat Plugin Check's static findings as authoritative for issues they cover.\n" .
+			"- Your job is to evaluate qualitative compliance with the guidelines above — things static checks can't decide.\n" .
+			"- Cite a filename, a header line, or a readme section when asserting FAIL.\n" .
+			"- If the category has no applicable WP.org guidelines listed, skip GUIDELINE VERDICTS and focus on best-practice observations.\n\n";
+
+		$output_format = "OUTPUT FORMAT (follow EXACTLY, in this order):\n\n" .
+			"**TRIAGE LEVEL**: [TRIVIAL|MINOR|MODERATE|CRITICAL]\n\n" .
+			"**SUMMARY**: 2-3 sentences describing overall compliance posture for this category.\n\n" .
+			$verdict_section . "\n" .
+			"**KEY OBSERVATIONS**:\n" .
+			"1. Observation with evidence\n" .
+			"2. Observation with evidence\n\n" .
+			"**RECOMMENDATIONS**:\n" .
+			"1. Specific, actionable recommendation\n" .
+			"2. Specific, actionable recommendation";
+
+		return $header . $rules . $instructions . $output_format;
 	}
 
 	/**
@@ -344,6 +373,51 @@ class AI_Review_General extends Abstract_File_Check {
 		$issue_list = array_slice( $all_issues, 0, 15 );
 
 		return "KEY ISSUES:\n" . implode( "\n", $issue_list );
+	}
+
+	/**
+	 * Extract per-guideline verdicts from the AI response.
+	 *
+	 * Expects lines shaped `[G7] FAIL — evidence text`. Accepts `:` or `-` as
+	 * separators and tolerates backticks, bold markers, or leading numbering
+	 * around the bracket. Only verdicts for known guideline IDs are returned;
+	 * unknown IDs and malformed lines are dropped.
+	 *
+	 * @param string $content AI response.
+	 * @return array<int,array{id:string,verdict:string,evidence:string}>
+	 */
+	protected function extract_verdicts( $content ) {
+		$out = array();
+		if ( ! preg_match_all(
+			'/^[\s`*\-\d\.]*\[(G\d{1,2})\][\s`*]*(PASS|FAIL|UNCLEAR)\b[\s`*:\-—]*(.*)$/mi',
+			$content,
+			$matches,
+			PREG_SET_ORDER
+		) ) {
+			return $out;
+		}
+
+		$seen = array();
+		foreach ( $matches as $m ) {
+			$id = strtoupper( $m[1] );
+			if ( isset( $seen[ $id ] ) ) {
+				continue; // first verdict for a given guideline wins
+			}
+			if ( null === WPOrg_Guidelines::get( $id ) ) {
+				continue;
+			}
+			$evidence = trim( preg_replace( '/^[\s`*]+|[\s`*]+$/', '', $m[3] ) );
+			if ( '' === $evidence ) {
+				$evidence = __( 'No evidence provided by model.', 'pcp-ai-addon' );
+			}
+			$out[]        = array(
+				'id'       => $id,
+				'verdict'  => strtoupper( $m[2] ),
+				'evidence' => $evidence,
+			);
+			$seen[ $id ] = true;
+		}
+		return $out;
 	}
 
 	/**

@@ -3,10 +3,11 @@
 AI-assisted triage and developer guidance layer on top of the [Plugin Check](https://wordpress.org/plugins/plugin-check/) (PCP) plugin.
 
 ## Status
-Current release: **v0.2.0**. Not yet submitted to WordPress.org — distributed via this GitHub repo.
+Current release: **v0.3.0**. Not yet submitted to WordPress.org — distributed via this GitHub repo.
 
 ## What it does
 - Runs five AI review passes (general, security, performance, accessibility, WP.org repo guidelines) alongside PCP's static checks.
+- **Evaluates every plugin against each of the [18 WordPress.org Detailed Plugin Guidelines](https://developer.wordpress.org/plugins/wordpress-org/detailed-plugin-guidelines/)** — each category prompt cites the guidelines in scope and requires the AI to emit a per-rule `PASS` / `FAIL` / `UNCLEAR` verdict with evidence. FAILs surface as Plugin Check errors with a deep link to the guideline text.
 - Uses OpenRouter as the inference backend. **Default model: Claude Opus 4.7** (`anthropic/claude-opus-4.7`). Switchable in Settings to Sonnet 4.6, Haiku 4.5, GPT-5, Grok, or any custom OpenRouter slug.
 - Settings page at **Settings → PCP AI Add-on** for API key + model selection.
 - **Agent-addressable** via a JSON REST endpoint and an MCP server (see [Agent access](#agent-access) below).

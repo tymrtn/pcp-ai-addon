@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PCP AI Reviewer Add-on
  * Description: Adds AI-assisted triage, developer packaging guidance, and workflow enhancements to Plugin Check.
- * Version: 0.2.0
+ * Version: 0.3.0
  * Author: Copyright.sh / PCP AI Team
  * License: GPL-2.0-or-later
  * Text Domain: pcp-ai-addon
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define plugin constants.
-define( 'PCP_AI_ADDON_VERSION', '0.2.0' );
+define( 'PCP_AI_ADDON_VERSION', '0.3.0' );
 define( 'PCP_AI_ADDON_PLUGIN_FILE', __FILE__ );
 define( 'PCP_AI_ADDON_DIR', plugin_dir_path( PCP_AI_ADDON_PLUGIN_FILE ) );
 define( 'PCP_AI_ADDON_URL', plugin_dir_url( PCP_AI_ADDON_PLUGIN_FILE ) );
