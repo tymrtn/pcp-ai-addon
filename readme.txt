@@ -3,7 +3,7 @@ Contributors: copyrightsh
 Requires at least: 6.3
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.3.0
+Stable tag: 0.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,11 @@ This add-on integrates with the official Plugin Check plugin to:
 4. Run Plugin Check — AI review results appear alongside the static findings.
 
 == Changelog ==
+
+= 0.3.1 =
+* Fix 5 wrong deep-link anchors on guideline URLs (G7, G10, G13, G15, G18) — clicking "See:" now jumps to the correct rule on developer.wordpress.org.
+* Missing or unparseable verdict lines from the model are now surfaced as UNCLEAR with explicit evidence ("Model did not emit a verdict line"), instead of being silently dropped. The compliance rollup "(of N checkable)" count now always matches the number of findings emitted.
+* Prompt example shape generalized so non-plugin_repo categories no longer see a GPL-specific example line that could seed irrelevant PASS evidence. The verdict section now lists the exact guideline IDs to emit, in order, with a neutral "[Gxx]" shape example.
 
 = 0.3.0 =
 * Guideline-grounded review prompts. Each of the 5 category checks now cites the specific WordPress.org Detailed Plugin Guidelines that apply to that category and requires the AI to emit a per-guideline PASS / FAIL / UNCLEAR verdict with evidence.

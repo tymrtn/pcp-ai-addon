@@ -73,7 +73,7 @@ class WPOrg_Guidelines {
                 'id' => 'G7', 'title' => 'No unauthorized user tracking / external contact',
                 'summary' => 'Plugins may not contact external servers without explicit opt-in consent. Any external service usage must be disclosed in the readme with a link to the service\'s terms and privacy policy.',
                 'category' => 'security', 'ai_checkable' => true,
-                'url' => self::DOC_URL . '#7-no-unauthorized-collection-of-user-data',
+                'url' => self::DOC_URL . '#7-plugins-may-not-track-users-without-their-consent',
             ),
             array(
                 'id' => 'G8', 'title' => 'No third-party executable code',
@@ -91,7 +91,7 @@ class WPOrg_Guidelines {
                 'id' => 'G10', 'title' => 'No unconsented external links / credits',
                 'summary' => 'Front-end "Powered By" links or credits must be optional and default-off. User must explicitly opt in to display them.',
                 'category' => 'general', 'ai_checkable' => true,
-                'url' => self::DOC_URL . '#10-external-links-on-the-public-site-must-be-optional',
+                'url' => self::DOC_URL . '#10-plugins-may-not-embed-external-links-or-credits-on-the-public-site-without-explicitly-asking-the-users-permission',
             ),
             array(
                 'id' => 'G11', 'title' => 'No dashboard hijacking',
@@ -109,7 +109,7 @@ class WPOrg_Guidelines {
                 'id' => 'G13', 'title' => 'Use WordPress default libraries',
                 'summary' => 'Do not bundle jQuery, Underscore, Backbone, or other libraries WordPress already ships. Use wp_enqueue_script with core-registered handles.',
                 'category' => 'performance', 'ai_checkable' => true,
-                'url' => self::DOC_URL . '#13-plugins-should-not-hijack-the-admin-dashboard',
+                'url' => self::DOC_URL . '#13-plugins-must-use-wordpress-default-libraries',
             ),
             array(
                 'id' => 'G14', 'title' => 'Avoid frequent SVN commits',
@@ -121,7 +121,7 @@ class WPOrg_Guidelines {
                 'id' => 'G15', 'title' => 'Increment version numbers',
                 'summary' => 'Users are only alerted to updates when the plugin version increases. The trunk readme.txt must always reflect the current version of the plugin.',
                 'category' => 'plugin_repo', 'ai_checkable' => true,
-                'url' => self::DOC_URL . '#15-version-numbers-must-be-incremented-for-every-new-release',
+                'url' => self::DOC_URL . '#15-plugin-version-numbers-must-be-incremented-for-each-new-release',
             ),
             array(
                 'id' => 'G16', 'title' => 'Plugin must be complete at submission',
@@ -139,7 +139,7 @@ class WPOrg_Guidelines {
                 'id' => 'G18', 'title' => 'Directory maintenance rights',
                 'summary' => 'WordPress.org reserves rights to update guidelines and moderate the directory. Procedural — not code-checkable.',
                 'category' => 'meta', 'ai_checkable' => false,
-                'url' => self::DOC_URL . '#18-wordpress-org-reserves-the-right-to-maintain-the-plugin-directory-to-the-benefit-of-the-community',
+                'url' => self::DOC_URL . '#18-we-reserve-the-right-to-maintain-the-plugin-directory-to-the-best-of-our-ability',
             ),
         );
     }

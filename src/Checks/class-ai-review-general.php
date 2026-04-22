@@ -126,17 +126,31 @@ class AI_Review_General extends Abstract_File_Check {
 		$recommendations = $this->extract_recommendations( $ai_content );
 		$verdicts        = $this->extract_verdicts( $ai_content );
 
-		// Emit per-guideline verdict messages BEFORE the summary so failures
-		// surface prominently in Plugin Check's results UI.
-		$pass = 0;
-		$fail = 0;
-		$unclear = 0;
+		// Build a verdict map keyed by guideline ID so we can backfill any
+		// guideline the model omitted or mis-formatted. This guarantees the
+		// compliance rollup math ALWAYS matches the "(of N checkable)" count —
+		// an omission by the model becomes UNCLEAR with a clear evidence
+		// message, never a silent drop.
+		$verdict_map = array();
 		foreach ( $verdicts as $verdict ) {
-			$guideline = WPOrg_Guidelines::get( $verdict['id'] );
-			if ( null === $guideline ) {
-				continue;
+			if ( null !== WPOrg_Guidelines::get( $verdict['id'] ) && ! isset( $verdict_map[ $verdict['id'] ] ) ) {
+				$verdict_map[ $verdict['id'] ] = $verdict;
 			}
-			$verdict_label = $verdict['verdict'];
+		}
+
+		$pass    = 0;
+		$fail    = 0;
+		$unclear = 0;
+		foreach ( WPOrg_Guidelines::for_category( $category ) as $guideline ) {
+			$id = $guideline['id'];
+			if ( isset( $verdict_map[ $id ] ) ) {
+				$verdict_label = $verdict_map[ $id ]['verdict'];
+				$evidence      = $verdict_map[ $id ]['evidence'];
+			} else {
+				$verdict_label = 'UNCLEAR';
+				$evidence      = __( 'Model did not emit a verdict line for this guideline.', 'pcp-ai-addon' );
+			}
+
 			if ( 'FAIL' === $verdict_label ) {
 				$fail++;
 				$result->add_message(
@@ -145,7 +159,7 @@ class AI_Review_General extends Abstract_File_Check {
 						__( '[%1$s] %2$s — FAIL. %3$s See: %4$s', 'pcp-ai-addon' ),
 						$guideline['id'],
 						$guideline['title'],
-						$verdict['evidence'],
+						$evidence,
 						$guideline['url']
 					),
 					array( 'code' => 'ai_guideline_' . strtolower( $guideline['id'] ) )
@@ -158,7 +172,7 @@ class AI_Review_General extends Abstract_File_Check {
 						__( '[%1$s] %2$s — UNCLEAR. %3$s See: %4$s', 'pcp-ai-addon' ),
 						$guideline['id'],
 						$guideline['title'],
-						$verdict['evidence'],
+						$evidence,
 						$guideline['url']
 					),
 					array( 'code' => 'ai_guideline_' . strtolower( $guideline['id'] ) )
@@ -261,17 +275,17 @@ class AI_Review_General extends Abstract_File_Check {
 		$verdict_section = '';
 
 		if ( ! empty( $guideline_ids ) ) {
-			$example_id = $guideline_ids[0];
+			$id_list         = implode( ', ', $guideline_ids );
 			$verdict_section = sprintf(
 				"**GUIDELINE VERDICTS** (one line per guideline ID, mandatory):\n" .
-				"Emit one line for EACH guideline listed above in this exact shape:\n" .
-				"`[ID] VERDICT — evidence`\n" .
+				"Emit exactly one line for EACH of these guideline IDs, in this order: %s.\n" .
+				"Shape (exact): `[ID] VERDICT — evidence`\n" .
 				"Where VERDICT is exactly one of: PASS, FAIL, UNCLEAR.\n" .
-				"Use FAIL only when you have concrete evidence of violation.\n" .
+				"Use FAIL only when you have concrete evidence of violation (cite a file, header line, or readme section).\n" .
 				"Use UNCLEAR when you cannot tell from the info provided (e.g. would need to read more source).\n" .
 				"Use PASS when evidence suggests compliance OR when the guideline is structurally N/A to this plugin.\n" .
-				"Example: `[%s] PASS — plugin header declares 'License: GPL-2.0-or-later' and no bundled code appears non-GPL-compatible.`\n",
-				$example_id
+				"Shape example (do NOT copy the ID or evidence verbatim): `[Gxx] PASS — brief evidence tied to Gxx's rule`\n",
+				$id_list
 			);
 		}
 

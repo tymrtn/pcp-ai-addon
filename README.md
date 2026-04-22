@@ -3,7 +3,7 @@
 AI-assisted triage and developer guidance layer on top of the [Plugin Check](https://wordpress.org/plugins/plugin-check/) (PCP) plugin.
 
 ## Status
-Current release: **v0.3.0**. Not yet submitted to WordPress.org — distributed via this GitHub repo.
+Current release: **v0.3.1**. Not yet submitted to WordPress.org — distributed via this GitHub repo.
 
 ## What it does
 - Runs five AI review passes (general, security, performance, accessibility, WP.org repo guidelines) alongside PCP's static checks.
